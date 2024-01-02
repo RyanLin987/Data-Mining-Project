@@ -1,0 +1,21 @@
+digraph Tree {
+node [shape=box, style="filled, rounded", color="black", fontname="helvetica"] ;
+edge [fontname="helvetica"] ;
+0 [label="Age <= 44.5\ngini = 0.455\nsamples = 100.0%\nvalue = [0.651, 0.349]\nclass = 死亡", fillcolor="#f3c5a3"] ;
+1 [label="Types_of_waters <= 6.5\ngini = 0.495\nsamples = 36.6%\nvalue = [0.452, 0.548]\nclass = 獲救", fillcolor="#dceefa"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label="gini = 0.453\nsamples = 6.8%\nvalue = [0.653, 0.347]\nclass = 死亡", fillcolor="#f3c4a2"] ;
+1 -> 2 ;
+3 [label="gini = 0.482\nsamples = 29.8%\nvalue = [0.406, 0.594]\nclass = 獲救", fillcolor="#c0e0f7"] ;
+1 -> 3 ;
+4 [label="Types_of_waters <= 4.5\ngini = 0.359\nsamples = 63.4%\nvalue = [0.766, 0.234]\nclass = 死亡", fillcolor="#eda876"] ;
+0 -> 4 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+5 [label="gini = 0.15\nsamples = 12.7%\nvalue = [0.918, 0.082]\nclass = 死亡", fillcolor="#e78c4b"] ;
+4 -> 5 ;
+6 [label="Season <= 1.5\ngini = 0.396\nsamples = 50.8%\nvalue = [0.728, 0.272]\nclass = 死亡", fillcolor="#efb083"] ;
+4 -> 6 ;
+7 [label="gini = 0.447\nsamples = 26.8%\nvalue = [0.662, 0.338]\nclass = 死亡", fillcolor="#f2c19e"] ;
+6 -> 7 ;
+8 [label="gini = 0.319\nsamples = 23.9%\nvalue = [0.801, 0.199]\nclass = 死亡", fillcolor="#eba06a"] ;
+6 -> 8 ;
+}
