@@ -202,8 +202,7 @@ X.columns=["City_or_County","Year","Month","Day","Hour","Minute",
            "Types_of_waters","Drowning_reasons","Gender","Age","Patient_ID",
            "Swimming_skills","Region","Day_of_Week",
            "Is_Holiday","Season","time_period"]
-y=data["Drowning_results"].values #讓index變成從0開始
-y=pd.Series(y,name='Drowning_results')
+y=data["Drowning_results"]
 
 
 
@@ -230,8 +229,9 @@ print(df_sorted)
 #決定要用的變數：
 data.info()
 selected_X=data[["Age","Types_of_waters","Season","Is_Holiday","Drowning_reasons",
-        "time_period","Swimming_skills","Gender","Region"]]
-y=y
+        "time_period","Swimming_skills","Gender","Region"]].reset_index(drop=True)
+
+y=data["Drowning_results"].reset_index(drop=True) #讓index變成從0開始
 
 
 
@@ -283,7 +283,7 @@ y=y
 
 
 
-#%%1 決策樹1
+#%%1 決策樹1(處理浮屍)
 
 data.info()
 selected_X.info()
@@ -338,7 +338,8 @@ print(pd.crosstab(selected_X["Drowning_reasons"], y,
 
 
 
-
+    
+    
 #將Drowning_reasons為"浮屍"的資料的資料，按比例隨機填入該變數的其他類別：
 
 # 確定比例，這裡假設按照其他類別的比例進行填充
@@ -354,7 +355,20 @@ for idx in drowning_indices:
     selected_X.at[idx, 'Drowning_reasons'] = random_other_reason
 
 
+#%% 決策樹(輸出給Ｒ)
 
+
+df_R = pd.concat([selected_X,y],axis=1)
+df_R.to_csv('new_data.csv', index=False)
+
+
+
+
+
+
+
+
+#%%1 決策樹2(再次挑選變數)
 #將Drowning_reasons重新編碼
 Drowning_reasons=le.fit_transform(selected_X["Drowning_reasons"])
 X=pd.DataFrame([Age,Types_of_waters,Season,Is_Holiday,
@@ -456,6 +470,16 @@ print("建模正確率=",format(clf.score(X_train,y_train)*100,".2f"),"%")
 print("測試正確率=",format(clf.score(X_test,y_test)*100,".2f"),"%")
 print("樹的葉子有多少個=",clf.get_n_leaves())
 print("樹的深度有多少層=",clf.get_depth())
+
+
+clf=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
+                            min_samples_leaf=80, min_samples_split=0.3)
+clf.fit(X_train,y_train)
+print("建模正確率=",format(clf.score(X_train,y_train)*100,".2f"),"%")
+print("測試正確率=",format(clf.score(X_test,y_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf.get_n_leaves())
+print("樹的深度有多少層=",clf.get_depth())
+
 
 from sklearn import tree
 dot_data=tree.export_graphviz(clf,out_file=None,
@@ -605,14 +629,6 @@ df_Region =  pd.DataFrame([Region,original_labels]).T
 df_Region.value_counts()
 
 
-#%% 決策樹(輸出給Ｒ)
-
-
-df_R = pd.concat([X,y],axis=1)
-df_R.to_csv('new_data.csv', index=False)
-
-
-
 
 #%%2 關聯法則
 
@@ -668,37 +684,116 @@ rules.to_csv("rules.csv")
 
 #%%3 SVM
 
-
-import pandas as pd
-bank=pd.read_csv("bank-data(3).csv")
+bank=df_R
 bank.info()
-subdata=bank[(bank["region"]=="INNER_CITY")|
-             (bank["region"]=="TOWN")|(bank["region"]=="RURAL")]
 
-x_train,y_train=subdata[["age","income"]],subdata["region"]
+
+
+
+
+
+
+
+
+from sklearn.preprocessing import LabelEncoder
+le=LabelEncoder()
+Is_Holiday=le.fit_transform(bank["Is_Holiday"])
+Gender=le.fit_transform(bank["Gender"])
+subdata= pd.DataFrame([Is_Holiday,Gender,bank["Age"]]).T
+subdata.columns=["Is_Holiday","Gender","Age"]
+
+X=subdata
+y=le.fit_transform(y_train)
+
+
+X=subdata
+y=y
+
+
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test=train_test_split(
+    X,y,test_size=0.2, random_state=20240104)
+
+
+
+
+
+
+
 from sklearn.preprocessing import StandardScaler
 ss=StandardScaler()
-ss.fit(x_train)
-x_train_std=ss.transform(x_train)
+ss.fit(X_train)
+X_train_std=ss.transform(X_train)
+X_test_std=ss.transform(X_test)
+
+
 
 from sklearn.preprocessing import LabelEncoder
 le=LabelEncoder()
 y_train=le.fit_transform(y_train)
+y_test=le.fit_transform(y_test)
+
+
+
 
 from sklearn.svm import LinearSVC
-m=LinearSVC(C=0.1, dual=False, class_weight="balanced")
-m.fit(x_train_std, y_train)
-y_pred=m.predict(x_train_std)
-print("訓練資料集正確率＝", m.score(x_train_std, y_train))
-print("訓練資料集分類錯誤筆數＝", (y_train!=y_pred).sum())
-print(1-(y_train!=y_pred).sum()/538)
-from sklearn.metrics import f1_score
-print("F1-score=", f1_score(y_train, y_pred, average="weighted"))
+m1=LinearSVC(C=0.1, dual=False, class_weight="balanced")
+m1.fit(X_train_std, y_train)
+y_pred=m1.predict(X_train_std)
+print("Linear1訓練正確率＝", m1.score(X_train_std, y_train))
+print("Linear1測試正確率＝", m1.score(X_test_std, y_test))
+
+m2=LinearSVC(C=0.4, dual=False, class_weight="balanced")
+m2.fit(X_train_std, y_train)
+y_pred=m2.predict(X_train_std)
+print("Linear2訓練正確率＝", m2.score(X_train_std, y_train))
+print("Linear2測試正確率＝", m2.score(X_test_std, y_test))
+
+m=LinearSVC(C=0.6, dual=False, class_weight="balanced")
+m.fit(X_train_std, y_train)
+y_pred=m.predict(X_train_std)
+print("Linear3訓練正確率＝", m.score(X_train_std, y_train))
+print("Linear3測試正確率＝", m.score(X_test_std, y_test))
+
+m=LinearSVC(C=0.9, dual=False, class_weight="balanced")
+m.fit(X_train_std, y_train)
+y_pred=m.predict(X_train_std)
+print("Linear4訓練正確率＝", m.score(X_train_std, y_train))
+print("Linear4測試正確率＝", m.score(X_test_std, y_test))
 
 
 
+from sklearn.svm import SVC
+m5=SVC(gamma=0.1, kernel="rbf",probability=True)
+m5.fit(X_train_std, y_train)
+y_pred=m5.predict(X_train_std)
+print("SVC1訓練正確率＝", m5.score(X_train_std, y_train))
+print("SVC1測試正確率＝", m5.score(X_test_std, y_test))
+
+m6=SVC(gamma=0.2, kernel="rbf",probability=True)
+m6.fit(X_train_std, y_train)
+y_pred=m6.predict(X_train_std)
+print("SVC2訓練正確率＝", m6.score(X_train_std, y_train))
+print("SVC2測試正確率＝", m6.score(X_test_std, y_test))
+
+m7=SVC(gamma=0.3, kernel="rbf",probability=True)
+m7.fit(X_train_std, y_train)
+y_pred=m7.predict(X_train_std)
+print("SVC3訓練正確率＝", m7.score(X_train_std, y_train))
+print("SVC3測試正確率＝", m7.score(X_test_std, y_test))
+
+m8=SVC(gamma=0.5, kernel="rbf",probability=True)
+m8.fit(X_train_std, y_train)
+y_pred=m8.predict(X_train_std)
+print("SVC4訓練正確率＝", m8.score(X_train_std, y_train))
+print("SVC4測試正確率＝", m8.score(X_test_std, y_test))
 
 
+
+#SVC
+from sklearn.svm import SVC 
+clf3=SVC(gamma=0.1, kernel="rbf",probability=True)
 
 
 
@@ -713,38 +808,56 @@ Created on Thu Dec 14 19:59:19 2023
 """
 
 import pandas as pd
-bank=pd.read_csv("bank-data(3).csv")
-bank.info()
-
+#編碼
 from sklearn.preprocessing import LabelEncoder
 le=LabelEncoder()
-sex=le.fit_transform(bank["sex"])
-married=le.fit_transform(bank["married"])
-children=le.fit_transform(bank["children"])
-car=le.fit_transform(bank["car"])
-save_act=le.fit_transform(bank["save_act"])
-current_act=le.fit_transform(bank["current_act"])
-mortgage=le.fit_transform(bank["mortgage"])
-X=pd.DataFrame([bank["age"],sex,bank["income"],married,
-               children,car,save_act,current_act,mortgage]).T
-X.columns=["age","sex","income","married",
-           "children","car","save_act","current_act","mortgage"]
 
-from sklearn.preprocessing import OneHotEncoder
-ohe=OneHotEncoder(sparse=False)
-region=ohe.fit_transform(bank[["region"]])
-region=pd.DataFrame(region)
-region.columns=ohe.categories_[0]
+Types_of_waters=le.fit_transform(selected_X["Types_of_waters"])
+Season=le.fit_transform(selected_X["Season"])
+Is_Holiday=le.fit_transform(selected_X["Is_Holiday"])
+Drowning_reasons=le.fit_transform(selected_X["Drowning_reasons"])
+time_period=le.fit_transform(selected_X["time_period"])
+Swimming_skills=le.fit_transform(selected_X["Swimming_skills"])
+Gender=le.fit_transform(selected_X["Gender"])
+Region=le.fit_transform(selected_X["Region"])
+# Age=selected_X["Age"].values
+Age=selected_X["Age"]
 
-newX=pd.concat([X,region],axis=1)
-y=bank["pep"]
+
+X=pd.DataFrame([Age,Types_of_waters,Season,Is_Holiday,
+                 Drowning_reasons,time_period,Swimming_skills,Gender,Region]).T
+X.columns=["Age","Types_of_waters","Season","Is_Holiday","Drowning_reasons",
+        "time_period","Swimming_skills","Gender","Region"]
+y=y
+
+
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test=train_test_split(
+    X,y,test_size=0.2, random_state=20240104)
+
+
 
 from sklearn.ensemble import RandomForestClassifier
 clf=RandomForestClassifier(n_estimators=200, max_depth=8, random_state=20231214)
-clf.fit(newX,y)
-print("隨機森林正確率＝", clf.score(newX, y))
+clf.fit(X_train,y_train)
+print("隨機森林1訓練正確率＝", clf.score(X_train, y_train))
+print("隨機森林1測試正確率＝", clf.score(X_test, y_test))
 
+clf=RandomForestClassifier(n_estimators=30, max_depth=8, random_state=20231214)
+clf.fit(X_train,y_train)
+print("隨機森林2訓練正確率＝", clf.score(X_train, y_train))
+print("隨機森林2測試正確率＝", clf.score(X_test, y_test))
 
+clf=RandomForestClassifier(n_estimators=200, max_depth=3, random_state=20231214)
+clf.fit(X_train,y_train)
+print("隨機森林3訓練正確率＝", clf.score(X_train, y_train))
+print("隨機森林3測試正確率＝", clf.score(X_test, y_test))
+
+clf=RandomForestClassifier(n_estimators=30, max_depth=3, random_state=20231214)
+clf.fit(X_train,y_train)
+print("隨機森林4訓練正確率＝", clf.score(X_train, y_train))
+print("隨機森林4測試正確率＝", clf.score(X_test, y_test))
 
 
 
@@ -755,90 +868,87 @@ print("隨機森林正確率＝", clf.score(newX, y))
 #%%5 KNN
 
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Dec  7 20:03:37 2023
-
-KNN
-"""
 
 import pandas as pd
 import numpy as np
 import statistics
 
-bank=pd.read_csv("#2-bank-data(1).csv")
-
-bank["age"]= np.where(bank["age"].isnull(),
-                      np.nanmedian(bank["age"]), bank["age"])
-bank["married"]= np.where(bank["married"].isnull(),
-                      statistics.mode(bank["married"]), bank["married"])
-
+bank=df_R
 bank.info()
+
+
+
+from sklearn.preprocessing import LabelEncoder
+le=LabelEncoder()
+Is_Holiday=le.fit_transform(bank["Is_Holiday"])
+Is_Holiday=pd.DataFrame(Is_Holiday, columns=["Is_Holiday"])
+
+
 
 from sklearn.preprocessing import OneHotEncoder
 ohe= OneHotEncoder(sparse=False)
-sex=ohe.fit_transform(bank[["sex"]])
-sex=pd.DataFrame(sex)
-sex.columns=ohe.categories_[0]
+Types_of_waters=ohe.fit_transform(bank[["Types_of_waters"]])
+Types_of_waters=pd.DataFrame(Types_of_waters)
+Types_of_waters.columns=ohe.categories_[0]
 
-region=ohe.fit_transform(bank[["region"]])
-region=pd.DataFrame(region)
-region.columns=ohe.categories_[0]
+Season=ohe.fit_transform(bank[["Season"]])
+Season=pd.DataFrame(Season)
+Season.columns=ohe.categories_[0]
 
-married=ohe.fit_transform(bank[["married"]])
-married=pd.DataFrame(married)
-#married.columns=ohe.categories_[0]
-married.columns=["married_"+s for s in ohe.categories_[0]]
+# Is_Holiday=ohe.fit_transform(bank[["Is_Holiday"]])
+# Is_Holiday=pd.DataFrame(Is_Holiday)
+# Is_Holiday.columns=ohe.categories_[0]
 
-car=ohe.fit_transform(bank[["car"]])
-car=pd.DataFrame(car)
-car.columns=["car_"+s for s in ohe.categories_[0]]
+Drowning_reasons=ohe.fit_transform(bank[["Drowning_reasons"]])
+Drowning_reasons=pd.DataFrame(Drowning_reasons)
+Drowning_reasons.columns=ohe.categories_[0]
 
-save_act=ohe.fit_transform(bank[["save_act"]])
-save_act=pd.DataFrame(save_act)
-save_act.columns=["save_act_"+s for s in ohe.categories_[0]]
+time_period=ohe.fit_transform(bank[["time_period"]])
+time_period=pd.DataFrame(time_period)
+time_period.columns=ohe.categories_[0]
 
-current_act=ohe.fit_transform(bank[["current_act"]])
-current_act=pd.DataFrame(current_act)
-current_act.columns=["current_act_"+s for s in ohe.categories_[0]]
+Swimming_skills=ohe.fit_transform(bank[["Swimming_skills"]])
+Swimming_skills=pd.DataFrame(Swimming_skills)
+Swimming_skills.columns=ohe.categories_[0]
 
-mortgage=ohe.fit_transform(bank[["mortgage"]])
-mortgage=pd.DataFrame(mortgage)
-mortgage.columns=["mortgage_"+s for s in ohe.categories_[0]]
+Gender=ohe.fit_transform(bank[["Gender"]])
+Gender=pd.DataFrame(Gender)
+Gender.columns=ohe.categories_[0]
+
+Region=ohe.fit_transform(bank[["Region"]])
+Region=pd.DataFrame(Region)
+Region.columns=ohe.categories_[0]
 
 
-X1=pd.concat([bank["age"],bank["income"],bank["children"]], axis=1)
-              
-              
-from sklearn.preprocessing import StandardScaler
-ss=StandardScaler().fit(X1)
-X1=ss.transform(X1)
+
+                  
+X1=bank["Age"]
 X1=pd.DataFrame(X1)
-X1.columns=["age","income","children"]
-              
-X=pd.concat([X1["age"],sex,region,X1["income"],married,
-            X1["children"],car,save_act,current_act,mortgage], axis=1)
+    
+from sklearn.preprocessing import StandardScaler
+ss=StandardScaler()
+X1=ss.fit_transform(X1)
+X1=pd.DataFrame(X1)
+X1.columns=["Age"]
+Age=X1      
 
-y=bank["pep"]
+        
+X=pd.concat([Age,Types_of_waters,Season,Is_Holiday,Drowning_reasons,
+             time_period,Swimming_skills,Gender,Region], axis=1)
+y=bank["Drowning_results"]
+
+
 
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test=train_test_split(
-    X,y,test_size=0.2, random_state=20231207)
+    X,y,test_size=0.2, random_state=20240104)
+
+
+
 
 from sklearn.neighbors import KNeighborsClassifier
-knn=KNeighborsClassifier()
-knn.fit(X_train,y_train)
-
-print("建模正確率:",knn.score(X_train, y_train))
-y_pred=knn.predict(X_test)
-
-from sklearn.metrics import accuracy_score
-print("測試正確率:",accuracy_score(y_test, y_pred))
-
-
 acc=[]
-for i in range(1,481):
+for i in range(1,1447):
     knn=KNeighborsClassifier(n_neighbors=i)
     knn.fit(X_train, y_train)
     y_pred=knn.predict(X_test)
@@ -847,11 +957,125 @@ for i in range(1,481):
   
 print("測試正確率最高的＝",max(acc))
 
-for i in range(1,481):
+for i in range(1,1447):
     if acc[i-1]==max(acc):
         bestK=i
  
 print("K=",bestK,"的測試正確率最高=",max(acc))        
+
+
+
+
+knn=KNeighborsClassifier(n_neighbors=17)
+knn.fit(X_train,y_train)
+print("建模正確率:",knn.score(X_train, y_train))
+
+y_pred=knn.predict(X_test)
+from sklearn.metrics import accuracy_score
+print("測試正確率:",accuracy_score(y_test, y_pred))
+
+
+#%%6 Ensembling
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec 14 20:43:17 2023
+
+@author: mac
+"""
+bank=df_R
+bank.info()
+
+
+from sklearn.preprocessing import LabelEncoder
+le=LabelEncoder()
+Is_Holiday=le.fit_transform(bank["Is_Holiday"])
+Gender=le.fit_transform(bank["Gender"])
+subdata= pd.DataFrame([Is_Holiday,Gender,bank["Age"]]).T
+subdata.columns=["Is_Holiday","Gender","Age"]
+
+X=subdata
+y=le.fit_transform(y)
+
+
+
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test=train_test_split(
+    X,y,test_size=0.2, random_state=20240104)
+
+
+
+
+#RF
+from sklearn.ensemble import RandomForestClassifier
+clf1=RandomForestClassifier(n_estimators=30, max_depth=8, random_state=20231214)
+#KNN
+from sklearn.neighbors import KNeighborsClassifier
+clf2=KNeighborsClassifier(n_neighbors=4)
+#SVC
+from sklearn.svm import SVC 
+clf3=SVC(gamma=0.1, kernel="rbf",probability=True)
+#平行集成學習
+from sklearn.ensemble import VotingClassifier
+clf4=VotingClassifier(estimators=[("RF",clf1),("KNN",clf2),("SVC",clf3)],
+                      voting="soft", n_jobs=-1) #n_jobs長設為-1
+
+
+
+
+
+
+clf1.fit(X_train,y_train)
+print("隨機森林訓練資料集正確率=",clf1.score(X_train, y_train))
+print("隨機森林測試資料集正確率=",clf1.score(X_test, y_test))
+
+
+
+from sklearn.preprocessing import StandardScaler
+ss=StandardScaler().fit(X_train)
+X_train_std=ss.fit_transform(X_train)
+X_test_std=ss.fit_transform(X_test)
+
+clf2.fit(X_train_std, y_train)
+print("KNN訓練資料集正確率=",clf2.score(X_train_std, y_train))
+print("KNN測試資料集正確率=",clf2.score(X_test_std, y_test))
+
+
+
+clf3.fit(X_train_std, y_train)
+print("SVM訓練資料集正確率=",clf3.score(X_train_std, y_train))
+print("SVM測試資料集正確率=",clf3.score(X_test_std, y_test))
+
+
+
+clf4.fit(X_train_std, y_train)
+print("集成分析法訓練資料集正確率=",clf4.score(X_train_std, y_train))
+print("集成分析法測試資料集正確率=",clf4.score(X_test_std, y_test))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
