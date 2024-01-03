@@ -23,7 +23,7 @@ TrainD<-dat[sindex,]
 TestD<-dat[-sindex,]
 
 library(RWeka)
-ctree<-J48(Drowning_results~.,data=TrainD,control=Weka_control(M=15,C=0.2))
+ctree<-J48(Drowning_results~.,data=TrainD,control=Weka_control(M=20,C=0.2))
 print(ctree)
 
 library(partykit)

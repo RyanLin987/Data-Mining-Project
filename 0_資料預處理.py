@@ -12,8 +12,7 @@ data.drop(["Number","Location_of_drowning"],axis=1,inplace=True) #刪除欄位
 ## 刪除理由：
 # Number
 # Location_of_drowning
-# Patient_ID
-# Swimming_skills
+
 
 
 
@@ -69,7 +68,7 @@ data['Gender'].value_counts() #不祥則填入眾數
 data['Age'].value_counts() 
 data['Patient_ID'].value_counts()
 data['Swimming_skills'].value_counts()
-# data["Age"]=np.where(data["Age"], , )
+
 
 
 data['City_or_County'].value_counts() #衍生出區域
@@ -166,19 +165,16 @@ data["Gender"]=np.where(data["Gender"]=="不詳", statistics.mode(data["Gender"]
 
 
 
-# data['Age'].value_counts() #要做離散化
+# data['Age'].value_counts() #離散化
 # pd.cut(data["Age"],bins=5).value_counts()
 # pd.qcut(data["Age"],q=8).value_counts()
 # data["Age"]=pd.cut(data["Age"],bins=3, labels=["a","b","c"])#等距
 # data["Age"]=pd.qcut(data["Age"],q=3, labels=["L","M","H"])#等次數
-
-
-#%%0 特徵選取
-
-
+#%%0 特徵選取1(卡方)
 from sklearn.preprocessing import LabelEncoder
 le=LabelEncoder()
 # data.info()
+#編碼
 City_or_County=le.fit_transform(data["City_or_County"])
 Types_of_waters=le.fit_transform(data["Types_of_waters"])
 Drowning_reasons=le.fit_transform(data["Drowning_reasons"])
@@ -191,9 +187,6 @@ Is_Holiday=le.fit_transform(data["Is_Holiday"])
 Season=le.fit_transform(data["Season"])
 time_period=le.fit_transform(data["time_period"])
 
-
-
-
 X=pd.DataFrame([City_or_County,data["Year"],data["Month"],data["Day"],
                 data["Hour"],data["Minute"],Types_of_waters,Drowning_reasons,
                 Gender,data["Age"],Patient_ID,Swimming_skills,Region,
@@ -202,7 +195,7 @@ X.columns=["City_or_County","Year","Month","Day","Hour","Minute",
            "Types_of_waters","Drowning_reasons","Gender","Age","Patient_ID",
            "Swimming_skills","Region","Day_of_Week",
            "Is_Holiday","Season","time_period"]
-y=data["Drowning_results"]
+y=data["Drowning_results"].reset_index(drop=True)
 
 
 
@@ -210,39 +203,20 @@ y=data["Drowning_results"]
 from sklearn.feature_selection import SelectKBest, chi2
 sk=SelectKBest(chi2,k=3)
 sk.fit(X,y)
-print(sk.get_feature_names_out()) 
 scores = sk.scores_
-rounded_scores = [round(score, 2) for score in scores] #格式：小數第二位
+rounded_scores = [round(score, 2) for score in scores] 
 df=pd.DataFrame([X.columns,rounded_scores]).T
 df.columns=["Variable", "score"]
-# 按照 Rounded_Scores 降序排序
 df_sorted = df.sort_values(by="score", ascending=False)
-print(df_sorted)
-
-
-
-
-
+print(df_sorted) #列出每個變數的score，按照score高低排列
 
 
 
 #決定要用的變數：
-data.info()
 selected_X=data[["Age","Types_of_waters","Season","Is_Holiday","Drowning_reasons",
         "time_period","Swimming_skills","Gender","Region"]].reset_index(drop=True)
 
 y=data["Drowning_results"].reset_index(drop=True) #讓index變成從0開始
-
-
-
-#%%0 切割訓練集與測試集：
-
-# from sklearn.model_selection import train_test_split
-# X_train, X_test, y_train, y_test=train_test_split(
-#     X,y,test_size=0.2, random_state=20240104)
-
-
-#%%
 # 假設 data 是你的資料框
 # # 使用條件選擇找到 "Drowning_reasons" 為 "浮屍" 且 "Drowning_results" 為 "死亡" 的資料
 # filtered_data = data[(data['Drowning_reasons'] == '浮屍') & (data['Drowning_results'] == '死亡')]
@@ -283,12 +257,7 @@ y=data["Drowning_results"].reset_index(drop=True) #讓index變成從0開始
 
 
 
-#%%1 決策樹1(處理浮屍)
-
-data.info()
-selected_X.info()
-
-
+#%%0 特徵選取2-1(處理浮屍)
 #編碼
 from sklearn.preprocessing import LabelEncoder
 le=LabelEncoder()
@@ -313,9 +282,6 @@ y=y
 
 # 挑選決策樹要使用的變數：
 print(df_sorted[df_sorted["Variable"].isin(X.columns)])
-
-
-
 #看看clf模型挑了哪些變數:
 from sklearn.tree import DecisionTreeClassifier
 clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
@@ -334,48 +300,47 @@ print(sm.get_feature_names_out()) #只挑了"Drowning_reasons"一個
 
 #觀察"Drowning_reasons"是否過度與目標變數重疊：
 print(pd.crosstab(selected_X["Drowning_reasons"], y, 
-    rownames=['Drowning_reasons'], colnames=['y']))##發現"浮屍"全數死亡
+             rownames=['Drowning_reasons'], colnames=['y']))##發現"浮屍"全數死亡
 
 
 
-    
-    
+#篩取其他資料
+data1=pd.concat([selected_X,y],axis=1)
+data1=data1[data1['Drowning_reasons'] != '浮屍']
+
+
+
 #將Drowning_reasons為"浮屍"的資料的資料，按比例隨機填入該變數的其他類別：
 
-# 確定比例，這裡假設按照其他類別的比例進行填充
-fill_ratio = selected_X[selected_X['Drowning_reasons'] != '浮屍']['Drowning_reasons'].value_counts(normalize=True)
-# 找到 "浮屍" 資料的索引
-drowning_indices = selected_X[selected_X['Drowning_reasons'] == '浮屍'].index
+# # 確定比例，這裡假設按照其他類別的比例進行填充
+# fill_ratio = selected_X[selected_X['Drowning_reasons'] != '浮屍']['Drowning_reasons'].value_counts(normalize=True)
+# # 找到 "浮屍" 資料的索引
+# drowning_indices = selected_X[selected_X['Drowning_reasons'] == '浮屍'].index
 
-# 遍歷每個 "浮屍" 資料，按照其他類別的比例隨機填入其他類別
-for idx in drowning_indices:
-    # 隨機選擇其他類別
-    random_other_reason = np.random.choice(fill_ratio.index, p=fill_ratio.values)
-    # 將選擇的其他類別填入
-    selected_X.at[idx, 'Drowning_reasons'] = random_other_reason
+# # 遍歷每個 "浮屍" 資料，按照其他類別的比例隨機填入其他類別
+# for idx in drowning_indices:
+#     # 隨機選擇其他類別
+#     random_other_reason = np.random.choice(fill_ratio.index, p=fill_ratio.values)
+#     # 將選擇的其他類別填入
+#     selected_X.at[idx, 'Drowning_reasons'] = random_other_reason
+#%% 輸出給Ｒ
+data1.to_csv('new_data.csv', index=False)
+#%%0 特徵選取2-2(無浮屍的data1)(選出最佳的X_new2)
+#編碼
+Types_of_waters=le.fit_transform(data1["Types_of_waters"])
+Season=le.fit_transform(data1["Season"])
+Is_Holiday=le.fit_transform(data1["Is_Holiday"])
+Drowning_reasons=le.fit_transform(data1["Drowning_reasons"])
+time_period=le.fit_transform(data1["time_period"])
+Swimming_skills=le.fit_transform(data1["Swimming_skills"])
+Gender=le.fit_transform(data1["Gender"])
+Region=le.fit_transform(data1["Region"])
 
-
-#%% 決策樹(輸出給Ｒ)
-
-
-df_R = pd.concat([selected_X,y],axis=1)
-df_R.to_csv('new_data.csv', index=False)
-
-
-
-
-
-
-
-
-#%%1 決策樹2(再次挑選變數)
-#將Drowning_reasons重新編碼
-Drowning_reasons=le.fit_transform(selected_X["Drowning_reasons"])
-X=pd.DataFrame([Age,Types_of_waters,Season,Is_Holiday,
+X=pd.DataFrame([data1["Age"],Types_of_waters,Season,Is_Holiday,
                  Drowning_reasons,time_period,Swimming_skills,Gender,Region]).T
 X.columns=["Age","Types_of_waters","Season","Is_Holiday","Drowning_reasons",
         "time_period","Swimming_skills","Gender","Region"]
-y=y
+y=data1["Drowning_results"]
 
 
 
@@ -385,66 +350,67 @@ clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
                            min_samples_split=0.25,
                            min_samples_leaf=2)
 clf.fit(X,y)
-print("建模方法的挑選變數正確率＝",clf.score(X, y))#0.7035
+print("建模方法的挑選變數正確率＝",clf.score(X, y))#0.6127
 print(clf.feature_importances_)
 
 from sklearn.feature_selection import SelectFromModel
 sm=SelectFromModel(clf,max_features=5)
 sm.fit(X,y)
-print(sm.get_feature_names_out()) #這次挑了2個
+print(sm.get_feature_names_out()) #這次挑了2個:['Age','Region']
 
 importances=clf.feature_importances_
 rounded_importances = [round(importance, 2) for importance in importances] #格式：小數第二位
 df2=pd.DataFrame([X.columns,rounded_importances]).T
 df2.columns=["Variable", "importance"]
 df_sorted2 = df2.sort_values(by="importance", ascending=False)
-print(df_sorted2)
-
+print(df_sorted2)#列出每個變數的importances，按照importances高低排列
 
 X_new2=sm.transform(X)
 X_new2=pd.DataFrame(X_new2)
-X_new2.columns=["Age","Types_of_waters"]
+X_new2.columns=["Age","Region"]
+#%%1 決策樹(編碼與分割)
 
+#編碼
+Types_of_waters=le.fit_transform(data1["Types_of_waters"])
+Season=le.fit_transform(data1["Season"])
+Is_Holiday=le.fit_transform(data1["Is_Holiday"])
+Drowning_reasons=le.fit_transform(data1["Drowning_reasons"])
+time_period=le.fit_transform(data1["time_period"])
+Swimming_skills=le.fit_transform(data1["Swimming_skills"])
+Gender=le.fit_transform(data1["Gender"])
+Region=le.fit_transform(data1["Region"])
 
+X=pd.DataFrame([data1["Age"],Types_of_waters,Season,Is_Holiday,
+                 Drowning_reasons,time_period,Swimming_skills,Gender,Region]).T
+X.columns=["Age","Types_of_waters","Season","Is_Holiday","Drowning_reasons",
+        "time_period","Swimming_skills","Gender","Region"]
+y=data1["Drowning_results"]
 
-
-
-
-
-#%%1 決策樹:全變數(訓練與測試)
-
-# #上採樣
-# from imblearn.over_sampling import SMOTE
-# X,y=SMOTE(random_state=0).fit_resample(X, y)
-# print("SMOTE")
-# print(y.value_counts())
-
+#分割訓練測試
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test=train_test_split(
     X,y,test_size=0.2, random_state=20240104)
+#%%1 決策樹:全變數data1建模(gini)：clf1,2
+#1
+clf1=DecisionTreeClassifier(random_state=20240104,criterion="gini",
+                           min_samples_leaf=5, min_samples_split=0.1)
+clf1.fit(X_train,y_train)
+print("建模正確率=",format(clf1.score(X_train,y_train)*100,".2f"),"%")
+print("測試正確率=",format(clf1.score(X_test,y_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf1.get_n_leaves())
+print("樹的深度有多少層=",clf1.get_depth())
 
-
-
-#%%1 決策樹:全變數建模(gini)調參：
-clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
-                           min_samples_leaf=80, min_samples_split=0.3)
-clf.fit(X_train,y_train)
-print("建模正確率=",format(clf.score(X_train,y_train)*100,".2f"),"%")
-print("測試正確率=",format(clf.score(X_test,y_test)*100,".2f"),"%")
-print("樹的葉子有多少個=",clf.get_n_leaves())
-print("樹的深度有多少層=",clf.get_depth())
-
-
-# clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
-#                            min_samples_leaf=10, min_samples_split=0.01)
-# clf.fit(X_train,y_train)
-# print("建模正確率=",format(clf.score(X_train,y_train)*100,".2f"),"%")
-# print("測試正確率=",format(clf.score(X_test,y_test)*100,".2f"),"%")
-# print("樹的葉子有多少個=",clf.get_n_leaves())
-# print("樹的深度有多少層=",clf.get_depth())
-
+#2
+clf2=DecisionTreeClassifier(random_state=20240104,criterion="gini",
+                            min_samples_leaf=10, min_samples_split=0.01)
+clf2.fit(X_train,y_train)
+print("建模正確率=",format(clf2.score(X_train,y_train)*100,".2f"),"%")
+print("測試正確率=",format(clf2.score(X_test,y_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf2.get_n_leaves())
+print("樹的深度有多少層=",clf2.get_depth())
+#繪圖(選1)
 from sklearn import tree
-dot_data=tree.export_graphviz(clf,out_file=None,
+dot_data=tree.export_graphviz(clf1,out_file=None,
                               feature_names=X.columns,
                               leaves_parallel=False,
                               impurity=True,
@@ -459,30 +425,27 @@ import graphviz
 graph=graphviz.Source(dot_data)
 graph.format="png"
 graph.render("tree_gini",view=False)
-
-
-
-#%%1 決策樹:全變數建模(entropy)
-clf=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
+#%%1 決策樹:全變數data1建模(entropy)：clf3,4
+#3
+clf3=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
                             min_samples_leaf=80, min_samples_split=0.3)
-clf.fit(X_train,y_train)
-print("建模正確率=",format(clf.score(X_train,y_train)*100,".2f"),"%")
-print("測試正確率=",format(clf.score(X_test,y_test)*100,".2f"),"%")
-print("樹的葉子有多少個=",clf.get_n_leaves())
-print("樹的深度有多少層=",clf.get_depth())
+clf3.fit(X_train,y_train)
+print("建模正確率=",format(clf3.score(X_train,y_train)*100,".2f"),"%")
+print("測試正確率=",format(clf3.score(X_test,y_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf3.get_n_leaves())
+print("樹的深度有多少層=",clf3.get_depth())
 
-
-clf=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
+#4
+clf4=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
                             min_samples_leaf=80, min_samples_split=0.3)
-clf.fit(X_train,y_train)
-print("建模正確率=",format(clf.score(X_train,y_train)*100,".2f"),"%")
-print("測試正確率=",format(clf.score(X_test,y_test)*100,".2f"),"%")
-print("樹的葉子有多少個=",clf.get_n_leaves())
-print("樹的深度有多少層=",clf.get_depth())
-
-
+clf4.fit(X_train,y_train)
+print("建模正確率=",format(clf4.score(X_train,y_train)*100,".2f"),"%")
+print("測試正確率=",format(clf4.score(X_test,y_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf4.get_n_leaves())
+print("樹的深度有多少層=",clf4.get_depth())
+#繪圖(選3)
 from sklearn import tree
-dot_data=tree.export_graphviz(clf,out_file=None,
+dot_data=tree.export_graphviz(clf3,out_file=None,
                               feature_names=X.columns,
                               leaves_parallel=False,
                               impurity=True,
@@ -497,47 +460,31 @@ import graphviz
 graph=graphviz.Source(dot_data)
 graph.format="png"
 graph.render("tree_entropy",view=False)
-
-
-
-
-
-from sklearn.model_selection import cross_val_score
-scores=cross_val_score(clf,X,y, cv=4, scoring="accuracy")
-print("交叉驗證的正確率=",format(scores.mean()*100,".2f")+"%")
-
-
-
-
-
-#%%1 決策樹:最佳變數(訓練與測試)
-
-
+#%%1 決策樹:最佳變數X_new2(分割)
 from sklearn.model_selection import train_test_split
 X2_train, X2_test, y2_train, y2_test=train_test_split(
     X_new2,y,test_size=0.2, random_state=20240104)
-
-
-
-#%%1 決策樹:最佳變數建模(gini)調參：
-clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
+#%%1 決策樹:最佳變數X_new2建模(gini)：clf5,6
+#5
+clf5=DecisionTreeClassifier(random_state=20240104,criterion="gini",
                            min_samples_leaf=80, min_samples_split=0.3)
-clf.fit(X2_train,y2_train)
-print("建模正確率=",format(clf.score(X2_train,y2_train)*100,".2f"),"%")
-print("測試正確率=",format(clf.score(X2_test,y2_test)*100,".2f"),"%")
-print("樹的葉子有多少個=",clf.get_n_leaves())
-print("樹的深度有多少層=",clf.get_depth())
+clf5.fit(X2_train,y2_train)
+print("建模正確率=",format(clf5.score(X2_train,y2_train)*100,".2f"),"%")
+print("測試正確率=",format(clf5.score(X2_test,y2_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf5.get_n_leaves())
+print("樹的深度有多少層=",clf5.get_depth())
 
-clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
+#6
+clf6=DecisionTreeClassifier(random_state=20240104,criterion="gini",
                            min_samples_leaf=10, min_samples_split=0.01)
-clf.fit(X2_train,y2_train)
-print("建模正確率=",format(clf.score(X2_train,y2_train)*100,".2f"),"%")
-print("測試正確率=",format(clf.score(X2_test,y2_test)*100,".2f"),"%")
-print("樹的葉子有多少個=",clf.get_n_leaves())
-print("樹的深度有多少層=",clf.get_depth())
-
+clf6.fit(X2_train,y2_train)
+print("建模正確率=",format(clf6.score(X2_train,y2_train)*100,".2f"),"%")
+print("測試正確率=",format(clf6.score(X2_test,y2_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf6.get_n_leaves())
+print("樹的深度有多少層=",clf6.get_depth())
+#繪圖(選5)
 from sklearn import tree
-dot_data=tree.export_graphviz(clf,out_file=None,
+dot_data=tree.export_graphviz(clf5,out_file=None,
                               feature_names=X.columns,
                               leaves_parallel=False,
                               impurity=True,
@@ -551,24 +498,28 @@ os.environ["PATH"] = "/opt/local/bin/"
 import graphviz
 graph=graphviz.Source(dot_data)
 graph.format="png"
-graph.render("tree_gini",view=False)
+graph.render("tree2_gini",view=False)
+#%%1 決策樹:最佳變數X_new2建模(entropy)：clf7,8
+#7
+clf7=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
+                           min_samples_leaf=80, min_samples_split=0.3)
+clf7.fit(X2_train,y2_train)
+print("建模正確率=",format(clf7.score(X2_train,y2_train)*100,".2f"),"%")
+print("測試正確率=",format(clf7.score(X2_test,y2_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf7.get_n_leaves())
+print("樹的深度有多少層=",clf7.get_depth())
 
-
-
-
-#%%1 決策樹:最佳變數建模(entropy)調參：
-from sklearn.tree import DecisionTreeClassifier
-clf=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
-                            min_samples_leaf=2, min_samples_split=0.25)
-clf.fit(X_train,y_train)
-print("建模正確率=",format(clf.score(X_train,y_train)*100,".2f"),"%")
-print("測試正確率=",format(clf.score(X_test,y_test)*100,".2f"),"%")
-print("樹的葉子有多少個=",clf.get_n_leaves())
-print("樹的深度有多少層=",clf.get_depth())
-
-
+#8
+clf8=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
+                           min_samples_leaf=10, min_samples_split=0.01)
+clf8.fit(X2_train,y2_train)
+print("建模正確率=",format(clf8.score(X2_train,y2_train)*100,".2f"),"%")
+print("測試正確率=",format(clf8.score(X2_test,y2_test)*100,".2f"),"%")
+print("樹的葉子有多少個=",clf8.get_n_leaves())
+print("樹的深度有多少層=",clf8.get_depth())
+#繪圖(選7)
 from sklearn import tree
-dot_data=tree.export_graphviz(clf,out_file=None,
+dot_data=tree.export_graphviz(clf7,out_file=None,
                               feature_names=X.columns,
                               leaves_parallel=False,
                               impurity=True,
@@ -582,253 +533,194 @@ os.environ["PATH"] = "/opt/local/bin/"
 import graphviz
 graph=graphviz.Source(dot_data)
 graph.format="png"
-graph.render("tree_entropy",view=False)
+graph.render("tree2_entropy",view=False)
+#%% 類別編號對應
+data1.info()
 
-
-
-from sklearn.model_selection import cross_val_score
-scores=cross_val_score(clf,X_new2,y, cv=4, scoring="accuracy")
-print("交叉驗證的正確率=",format(scores.mean()*100,".2f")+"%")
-
-
-#%%1 類別編號對應
-
-
-X.info()
-
-original_labels=selected_X["Types_of_waters"]
+original_labels=data1["Types_of_waters"]
 df_Types_of_waters =  pd.DataFrame([Types_of_waters,original_labels]).T
 df_Types_of_waters.value_counts()
 
-original_labels=selected_X["Season"]
+
+original_labels=data1["Season"]
 df_Season =  pd.DataFrame([Season,original_labels]).T
 df_Season.value_counts()
 
-original_labels=selected_X["Is_Holiday"]
+original_labels=data1["Is_Holiday"]
 df_Is_Holiday =  pd.DataFrame([Is_Holiday,original_labels]).T
 df_Is_Holiday.value_counts()
 
-original_labels=selected_X["Drowning_reasons"]
+original_labels=data1["Drowning_reasons"]
 df_Drowning_reasons =  pd.DataFrame([Drowning_reasons,original_labels]).T
 df_Drowning_reasons.value_counts()
     
-original_labels=selected_X["time_period"]
+original_labels=data1["time_period"]
 df_time_period =  pd.DataFrame([time_period,original_labels]).T
 df_time_period.value_counts()
 
-original_labels=selected_X["Swimming_skills"]
+original_labels=data1["Swimming_skills"]
 df_Swimming_skills =  pd.DataFrame([Swimming_skills,original_labels]).T
 df_Swimming_skills.value_counts()
 
-original_labels=selected_X["Gender"]
+original_labels=data1["Gender"]
 df_Gender =  pd.DataFrame([Gender,original_labels]).T
 df_Gender.value_counts()
 
-original_labels=selected_X["Region"]
+original_labels=data1["Region"]
 df_Region =  pd.DataFrame([Region,original_labels]).T
 df_Region.value_counts()
-
-
-
 #%%2 關聯法則
 
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Nov 23 20:16:20 2023
+# #!/usr/bin/env python3
+# # -*- coding: utf-8 -*-
+# """
+# Created on Thu Nov 23 20:16:20 2023
 
-## basket data analysis
-"""
-#df.info()
+# ## basket data analysis
+# """
+# #df.info()
 
-import pandas as pd
-df=pd.read_csv("Retail.csv")
-df["Description"]=df["Description"].str.strip()
-df.dropna(axis=0,subset=["InvoiceNo"],inplace=True)
-df["InvoiceNo"]=df["InvoiceNo"].astype("str")
-df=df[~df["InvoiceNo"].str.contains("C")]#不要含C的，C開頭代表退貨
+# import pandas as pd
+# df=pd.read_csv("Retail.csv")
+# df["Description"]=df["Description"].str.strip()
+# df.dropna(axis=0,subset=["InvoiceNo"],inplace=True)
+# df["InvoiceNo"]=df["InvoiceNo"].astype("str")
+# df=df[~df["InvoiceNo"].str.contains("C")]#不要含C的，C開頭代表退貨
 
-basket=(
-        df[df["Country"]=="France"]
-       .groupby(["InvoiceNo","Description"])["Quantity"]
-       .sum().unstack().reset_index().fillna(0).set_index("InvoiceNo")
-       )
-
-
-
-
-
-def encode_units(x):
-    if x<=0:
-        return 0
-    else:
-        return 1
-
-basket_sets=basket.applymap(encode_units)
-basket_sets.drop("POSTAGE",inplace=True,axis=1)
-
-#pip install mlxtend
-from mlxtend.frequent_patterns import apriori
-from mlxtend.frequent_patterns import association_rules
-
-frequent_itemsets=apriori(basket_sets, min_support=0.07, use_colnames=True)
-rules=association_rules(frequent_itemsets,metric="lift",min_threshold=1.1)
-rules.to_csv("rules.csv")
+# basket=(
+#         df[df["Country"]=="France"]
+#        .groupby(["InvoiceNo","Description"])["Quantity"]
+#        .sum().unstack().reset_index().fillna(0).set_index("InvoiceNo")
+#        )
 
 
 
 
 
+# def encode_units(x):
+#     if x<=0:
+#         return 0
+#     else:
+#         return 1
 
+# basket_sets=basket.applymap(encode_units)
+# basket_sets.drop("POSTAGE",inplace=True,axis=1)
 
+# #pip install mlxtend
+# from mlxtend.frequent_patterns import apriori
+# from mlxtend.frequent_patterns import association_rules
 
-#%%3 SVM
+# frequent_itemsets=apriori(basket_sets, min_support=0.07, use_colnames=True)
+# rules=association_rules(frequent_itemsets,metric="lift",min_threshold=1.1)
+# rules.to_csv("rules.csv")
 
-bank=df_R
-bank.info()
-
-
-
-
-
-
-
-
-
+#%%3 SVM(使用Is_Holiday,Gender,Age)
+data1.info()
+#編碼
 from sklearn.preprocessing import LabelEncoder
 le=LabelEncoder()
-Is_Holiday=le.fit_transform(bank["Is_Holiday"])
-Gender=le.fit_transform(bank["Gender"])
-subdata= pd.DataFrame([Is_Holiday,Gender,bank["Age"]]).T
+Is_Holiday=le.fit_transform(data1["Is_Holiday"])
+Gender=le.fit_transform(data1["Gender"])
+subdata= pd.DataFrame([Is_Holiday,Gender,data1["Age"]]).T
 subdata.columns=["Is_Holiday","Gender","Age"]
 
 X=subdata
-y=le.fit_transform(y_train)
-
-
-X=subdata
-y=y
+y=pd.Series(le.fit_transform(data1["Drowning_results"]),name="Drowning_results")
 
 
 
+#切割
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test=train_test_split(
     X,y,test_size=0.2, random_state=20240104)
 
 
 
-
-
-
-
+#標準化
 from sklearn.preprocessing import StandardScaler
 ss=StandardScaler()
 ss.fit(X_train)
 X_train_std=ss.transform(X_train)
 X_test_std=ss.transform(X_test)
+#%%3 SVM
 
-
-
-from sklearn.preprocessing import LabelEncoder
-le=LabelEncoder()
-y_train=le.fit_transform(y_train)
-y_test=le.fit_transform(y_test)
-
-
-
-
+##Linear
 from sklearn.svm import LinearSVC
+#1
 m1=LinearSVC(C=0.1, dual=False, class_weight="balanced")
 m1.fit(X_train_std, y_train)
-y_pred=m1.predict(X_train_std)
 print("Linear1訓練正確率＝", m1.score(X_train_std, y_train))
 print("Linear1測試正確率＝", m1.score(X_test_std, y_test))
 
+#2
 m2=LinearSVC(C=0.4, dual=False, class_weight="balanced")
 m2.fit(X_train_std, y_train)
-y_pred=m2.predict(X_train_std)
 print("Linear2訓練正確率＝", m2.score(X_train_std, y_train))
 print("Linear2測試正確率＝", m2.score(X_test_std, y_test))
 
-m=LinearSVC(C=0.6, dual=False, class_weight="balanced")
-m.fit(X_train_std, y_train)
-y_pred=m.predict(X_train_std)
-print("Linear3訓練正確率＝", m.score(X_train_std, y_train))
-print("Linear3測試正確率＝", m.score(X_test_std, y_test))
+#3
+m3=LinearSVC(C=0.6, dual=False, class_weight="balanced")
+m3.fit(X_train_std, y_train)
+print("Linear3訓練正確率＝", m3.score(X_train_std, y_train))
+print("Linear3測試正確率＝", m3.score(X_test_std, y_test))
 
-m=LinearSVC(C=0.9, dual=False, class_weight="balanced")
-m.fit(X_train_std, y_train)
-y_pred=m.predict(X_train_std)
-print("Linear4訓練正確率＝", m.score(X_train_std, y_train))
-print("Linear4測試正確率＝", m.score(X_test_std, y_test))
+#4
+m4=LinearSVC(C=0.9, dual=False, class_weight="balanced")
+m4.fit(X_train_std, y_train)
+print("Linear4訓練正確率＝", m4.score(X_train_std, y_train))
+print("Linear4測試正確率＝", m4.score(X_test_std, y_test))
 
 
 
+##SVC
 from sklearn.svm import SVC
+#5
 m5=SVC(gamma=0.1, kernel="rbf",probability=True)
 m5.fit(X_train_std, y_train)
 y_pred=m5.predict(X_train_std)
 print("SVC1訓練正確率＝", m5.score(X_train_std, y_train))
 print("SVC1測試正確率＝", m5.score(X_test_std, y_test))
 
+#6
 m6=SVC(gamma=0.2, kernel="rbf",probability=True)
 m6.fit(X_train_std, y_train)
 y_pred=m6.predict(X_train_std)
 print("SVC2訓練正確率＝", m6.score(X_train_std, y_train))
 print("SVC2測試正確率＝", m6.score(X_test_std, y_test))
 
+#7
 m7=SVC(gamma=0.3, kernel="rbf",probability=True)
 m7.fit(X_train_std, y_train)
 y_pred=m7.predict(X_train_std)
 print("SVC3訓練正確率＝", m7.score(X_train_std, y_train))
 print("SVC3測試正確率＝", m7.score(X_test_std, y_test))
 
+#8
 m8=SVC(gamma=0.5, kernel="rbf",probability=True)
 m8.fit(X_train_std, y_train)
 y_pred=m8.predict(X_train_std)
 print("SVC4訓練正確率＝", m8.score(X_train_std, y_train))
 print("SVC4測試正確率＝", m8.score(X_test_std, y_test))
-
-
-
-#SVC
-from sklearn.svm import SVC 
-clf3=SVC(gamma=0.1, kernel="rbf",probability=True)
-
-
-
-
-
 #%%4 RF
-
-"""
-Created on Thu Dec 14 19:59:19 2023
-
-@author: mac
-"""
-
 import pandas as pd
 #編碼
 from sklearn.preprocessing import LabelEncoder
 le=LabelEncoder()
+Types_of_waters=le.fit_transform(data1["Types_of_waters"])
+Season=le.fit_transform(data1["Season"])
+Is_Holiday=le.fit_transform(data1["Is_Holiday"])
+Drowning_reasons=le.fit_transform(data1["Drowning_reasons"])
+time_period=le.fit_transform(data1["time_period"])
+Swimming_skills=le.fit_transform(data1["Swimming_skills"])
+Gender=le.fit_transform(data1["Gender"])
+Region=le.fit_transform(data1["Region"])
 
-Types_of_waters=le.fit_transform(selected_X["Types_of_waters"])
-Season=le.fit_transform(selected_X["Season"])
-Is_Holiday=le.fit_transform(selected_X["Is_Holiday"])
-Drowning_reasons=le.fit_transform(selected_X["Drowning_reasons"])
-time_period=le.fit_transform(selected_X["time_period"])
-Swimming_skills=le.fit_transform(selected_X["Swimming_skills"])
-Gender=le.fit_transform(selected_X["Gender"])
-Region=le.fit_transform(selected_X["Region"])
-# Age=selected_X["Age"].values
-Age=selected_X["Age"]
-
-
-X=pd.DataFrame([Age,Types_of_waters,Season,Is_Holiday,
+X=pd.DataFrame([data1["Age"].values,Types_of_waters,Season,Is_Holiday,
                  Drowning_reasons,time_period,Swimming_skills,Gender,Region]).T
 X.columns=["Age","Types_of_waters","Season","Is_Holiday","Drowning_reasons",
         "time_period","Swimming_skills","Gender","Region"]
-y=y
+
+y=pd.Series(data1["Drowning_results"],name="Drowning_results")
 
 
 
@@ -839,90 +731,70 @@ X_train, X_test, y_train, y_test=train_test_split(
 
 
 from sklearn.ensemble import RandomForestClassifier
-clf=RandomForestClassifier(n_estimators=200, max_depth=8, random_state=20231214)
-clf.fit(X_train,y_train)
-print("隨機森林1訓練正確率＝", clf.score(X_train, y_train))
-print("隨機森林1測試正確率＝", clf.score(X_test, y_test))
+clf1=RandomForestClassifier(n_estimators=200, max_depth=8, random_state=20240104)
+clf1.fit(X_train,y_train)
+print("隨機森林1訓練正確率＝", clf1.score(X_train, y_train))
+print("隨機森林1測試正確率＝", clf1.score(X_test, y_test))
 
-clf=RandomForestClassifier(n_estimators=30, max_depth=8, random_state=20231214)
-clf.fit(X_train,y_train)
-print("隨機森林2訓練正確率＝", clf.score(X_train, y_train))
-print("隨機森林2測試正確率＝", clf.score(X_test, y_test))
+clf2=RandomForestClassifier(n_estimators=25, max_depth=8, random_state=20240104)
+clf2.fit(X_train,y_train)
+print("隨機森林2訓練正確率＝", clf2.score(X_train, y_train))
+print("隨機森林2測試正確率＝", clf2.score(X_test, y_test))
 
-clf=RandomForestClassifier(n_estimators=200, max_depth=3, random_state=20231214)
-clf.fit(X_train,y_train)
-print("隨機森林3訓練正確率＝", clf.score(X_train, y_train))
-print("隨機森林3測試正確率＝", clf.score(X_test, y_test))
+clf3=RandomForestClassifier(n_estimators=200, max_depth=4, random_state=20240104)
+clf3.fit(X_train,y_train)
+print("隨機森林3訓練正確率＝", clf3.score(X_train, y_train))
+print("隨機森林3測試正確率＝", clf3.score(X_test, y_test))
 
-clf=RandomForestClassifier(n_estimators=30, max_depth=3, random_state=20231214)
-clf.fit(X_train,y_train)
-print("隨機森林4訓練正確率＝", clf.score(X_train, y_train))
-print("隨機森林4測試正確率＝", clf.score(X_test, y_test))
-
-
-
-
-
-
-
+clf4=RandomForestClassifier(n_estimators=25, max_depth=4, random_state=20240104)
+clf4.fit(X_train,y_train)
+print("隨機森林4訓練正確率＝", clf4.score(X_train, y_train))
+print("隨機森林4測試正確率＝", clf4.score(X_test, y_test))
 #%%5 KNN
-
-
-
 import pandas as pd
 import numpy as np
 import statistics
 
-bank=df_R
-bank.info()
-
-
-
+#編碼
+#(Label Encoder) #Is_Holiday為布林值，OneHot會出問題
 from sklearn.preprocessing import LabelEncoder
 le=LabelEncoder()
-Is_Holiday=le.fit_transform(bank["Is_Holiday"])
+Is_Holiday=le.fit_transform(data1["Is_Holiday"])
 Is_Holiday=pd.DataFrame(Is_Holiday, columns=["Is_Holiday"])
 
-
-
+#(One Hot Encoder)
 from sklearn.preprocessing import OneHotEncoder
 ohe= OneHotEncoder(sparse=False)
-Types_of_waters=ohe.fit_transform(bank[["Types_of_waters"]])
+Types_of_waters=ohe.fit_transform(data1[["Types_of_waters"]])
 Types_of_waters=pd.DataFrame(Types_of_waters)
 Types_of_waters.columns=ohe.categories_[0]
 
-Season=ohe.fit_transform(bank[["Season"]])
+Season=ohe.fit_transform(data1[["Season"]])
 Season=pd.DataFrame(Season)
 Season.columns=ohe.categories_[0]
 
-# Is_Holiday=ohe.fit_transform(bank[["Is_Holiday"]])
-# Is_Holiday=pd.DataFrame(Is_Holiday)
-# Is_Holiday.columns=ohe.categories_[0]
-
-Drowning_reasons=ohe.fit_transform(bank[["Drowning_reasons"]])
+Drowning_reasons=ohe.fit_transform(data1[["Drowning_reasons"]])
 Drowning_reasons=pd.DataFrame(Drowning_reasons)
 Drowning_reasons.columns=ohe.categories_[0]
 
-time_period=ohe.fit_transform(bank[["time_period"]])
+time_period=ohe.fit_transform(data1[["time_period"]])
 time_period=pd.DataFrame(time_period)
 time_period.columns=ohe.categories_[0]
 
-Swimming_skills=ohe.fit_transform(bank[["Swimming_skills"]])
+Swimming_skills=ohe.fit_transform(data1[["Swimming_skills"]])
 Swimming_skills=pd.DataFrame(Swimming_skills)
 Swimming_skills.columns=ohe.categories_[0]
 
-Gender=ohe.fit_transform(bank[["Gender"]])
+Gender=ohe.fit_transform(data1[["Gender"]])
 Gender=pd.DataFrame(Gender)
 Gender.columns=ohe.categories_[0]
 
-Region=ohe.fit_transform(bank[["Region"]])
+Region=ohe.fit_transform(data1[["Region"]])
 Region=pd.DataFrame(Region)
 Region.columns=ohe.categories_[0]
 
-
-
-                  
-X1=bank["Age"]
+#標準化
+X1=data1["Age"]
 X1=pd.DataFrame(X1)
     
 from sklearn.preprocessing import StandardScaler
@@ -932,23 +804,24 @@ X1=pd.DataFrame(X1)
 X1.columns=["Age"]
 Age=X1      
 
-        
 X=pd.concat([Age,Types_of_waters,Season,Is_Holiday,Drowning_reasons,
              time_period,Swimming_skills,Gender,Region], axis=1)
-y=bank["Drowning_results"]
+y=pd.Series(data1["Drowning_results"],name="Drowning_results")
 
 
 
+#分割
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test=train_test_split(
     X,y,test_size=0.2, random_state=20240104)
 
 
 
-
+#KNN
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
 acc=[]
-for i in range(1,1447):
+for i in range(1,993):
     knn=KNeighborsClassifier(n_neighbors=i)
     knn.fit(X_train, y_train)
     y_pred=knn.predict(X_test)
@@ -957,7 +830,7 @@ for i in range(1,1447):
   
 print("測試正確率最高的＝",max(acc))
 
-for i in range(1,1447):
+for i in range(1,993):
     if acc[i-1]==max(acc):
         bestK=i
  
@@ -965,16 +838,12 @@ print("K=",bestK,"的測試正確率最高=",max(acc))
 
 
 
-
-knn=KNeighborsClassifier(n_neighbors=17)
+knn=KNeighborsClassifier(n_neighbors=bestK)
 knn.fit(X_train,y_train)
 print("建模正確率:",knn.score(X_train, y_train))
 
 y_pred=knn.predict(X_test)
-from sklearn.metrics import accuracy_score
 print("測試正確率:",accuracy_score(y_test, y_pred))
-
-
 #%%6 Ensembling
 
 #!/usr/bin/env python3
@@ -1054,36 +923,95 @@ clf4.fit(X_train_std, y_train)
 print("集成分析法訓練資料集正確率=",clf4.score(X_train_std, y_train))
 print("集成分析法測試資料集正確率=",clf4.score(X_test_std, y_test))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #%%7 k-means
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec 21 18:49:09 2023
+
+@author: mac
+"""
+
+import pandas as pd
+bank=pd.read_csv("bank-data(3).csv") 
+#bank.info()
+from sklearn.preprocessing import scale
+from sklearn.preprocessing import LabelEncoder
+le=LabelEncoder()
+sex=le.fit_transform(bank["sex"])
+married=le.fit_transform(bank["married"])
+children=le.fit_transform(bank["children"])
+car=le.fit_transform(bank["car"])
+save_act=le.fit_transform(bank["save_act"])
+current_act=le.fit_transform(bank["current_act"])
+mortgage=le.fit_transform(bank["mortgage"])
+pep=le.fit_transform(bank["pep"])
+X=pd.DataFrame([scale(bank["age"]),sex,scale(bank["income"]),
+                married,children,car,save_act,current_act,mortgage,pep]).T
+X.columns=["age","sex","income","married","children","car","save_act","current_act","mortgage","pep"]
+
+
+from sklearn.preprocessing import OneHotEncoder
+ohe=OneHotEncoder(sparse=False)
+region=ohe.fit_transform(bank[["region"]])
+region=pd.DataFrame(region)
+region.columns=ohe.categories_[0]
+
+newX=pd.concat([X,region],axis=1)
+
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
+
+distortion=[]
+for i in range(10):
+    kmeans=KMeans(n_clusters=i+1, init="k-means++",
+                  random_state=20231221, n_init=15, max_iter=200)
+    kmeans.fit(newX)
+    distortion.append(kmeans.inertia_)
+    
+print(distortion)    
+
+plt.plot(range(1,11),distortion, marker="o")
+plt.xlabel("Number of clusters")
+plt.ylabel("SSE")
+
+kmeans=KMeans(n_clusters=4, init="k-means++",
+              random_state=20231221, n_init=15, max_iter=200)
+kmeans.fit(newX)
+centroid=pd.DataFrame(kmeans.cluster_centers_,columns=newX.columns)
+
+'''
+X_pred=kmeans.predict(newX)
+print(pd.crosstab(bank["pep"], X_pred))
+print("用分群來預測分類的正確率＝",(75+113+61+99)/600)
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
