@@ -188,7 +188,7 @@ X_train, X_test, y_train, y_test=train_test_split(
 #卡方挑變數
 from sklearn.feature_selection import SelectKBest, chi2
 sk=SelectKBest(chi2,k=5)
-sk.fit(X,y)
+sk.fit(X_train,y_train)
 print(sk.get_feature_names_out())  
 #['Types_of_waters' 'Drowning_reasons' 'Age' 'Is_Holiday' 'Season']
 
@@ -210,13 +210,13 @@ from sklearn.tree import DecisionTreeClassifier
 clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
                            min_samples_split=0.25,
                            min_samples_leaf=2)
-clf.fit(X,y)
-print("建模方法的挑選變數正確率＝",clf.score(X, y))#0.7251
-print(clf.feature_importances_) #發現第五個變數(Drowning_reasons)就佔了94.63%
+clf.fit(X_train,y_train)
+print("建模方法的挑選變數正確率＝",clf.score(X_train, y_train))#0.7251
+print(clf.feature_importances_) #發現第二個變數(Drowning_reasons)就佔了92.8%
 
 from sklearn.feature_selection import SelectFromModel
 sm=SelectFromModel(clf,max_features=5)
-sm.fit(X,y)
+sm.fit(X_train,y_train)
 print(sm.get_feature_names_out()) #只挑了"Drowning_reasons"一個
 
 
@@ -266,15 +266,20 @@ X.columns=["Types_of_waters","Drowning_reasons","Gender","Age",
            "Region","Is_Holiday","Season","time_period"]
 y=data1["Drowning_results"]
 
+#分割訓練測試
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test=train_test_split(
+    X,y,test_size=0.2, random_state=20240104)
+
 
 
 #1.處理完浮屍後再卡方挑選一次:
 from sklearn.feature_selection import SelectKBest, chi2
 sk=SelectKBest(chi2,k=5)
-sk.fit(X,y)
+sk.fit(X_train,y_train)
 print(sk.get_feature_names_out())
 #變成['Types_of_waters' 'Drowning_reasons' 'Gender' 'Age' 'Season']
-X_new1=sk.transform(X)
+X_new1=sk.transform(X_train)
 X_new1=pd.DataFrame(X_new1)
 X_new1.columns=['Types_of_waters','Drowning_reasons','Gender','Age','Season']
 
@@ -284,7 +289,7 @@ df=pd.DataFrame([X.columns,rounded_scores]).T
 df.columns=["Variable", "score"]
 df_sorted = df.sort_values(by="score", ascending=False)
 print(df_sorted)#列出每個變數的score，按照score高低排列，取前四高(Season與Gender落差大)
-X_top4=X[['Age','Drowning_reasons','Types_of_waters','Season']]
+X_top4=X_train[['Age','Drowning_reasons','Types_of_waters','Season']]
 
 
 
@@ -293,13 +298,13 @@ from sklearn.tree import DecisionTreeClassifier
 clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
                            min_samples_split=0.25,
                            min_samples_leaf=2)
-clf.fit(X,y)
-print("建模方法的挑選變數正確率＝",clf.score(X, y))#0.6417
+clf.fit(X_train,y_train)
+print("建模方法的挑選變數正確率＝",clf.score(X_train, y_train))#0.6417
 print(clf.feature_importances_)
 
 from sklearn.feature_selection import SelectFromModel
 sm=SelectFromModel(clf,max_features=5)
-sm.fit(X,y)
+sm.fit(X_train,y_train)
 print(sm.get_feature_names_out())#['Types_of_waters','Drowning_reasons','Age']
 
 importances=clf.feature_importances_
@@ -309,7 +314,7 @@ df2.columns=["Variable", "importance"]
 df_sorted2 = df2.sort_values(by="importance", ascending=False)
 print(df_sorted2)#列出每個變數的importances，按照importances高低排列
 
-X_new2=sm.transform(X)
+X_new2=sm.transform(X_train)
 X_new2=pd.DataFrame(X_new2)
 X_new2.columns=['Types_of_waters','Drowning_reasons','Age']
 #%%0 特徵選取4(比較)
@@ -325,18 +330,18 @@ clf=DecisionTreeClassifier(random_state=20240104,criterion="gini",
                            min_samples_leaf=50,
                            max_depth=20)
 
-clf.fit(X, y)
+clf.fit(X_train, y_train)
 print("使用全部八個變數的模型正確率＝",
-      format(clf.score(X, y)*100,".2f"),"%","樹深度為",clf.get_depth())
-clf.fit(X_new1, y)
+      format(clf.score(X_train, y_train)*100,".2f"),"%","樹深度為",clf.get_depth())
+clf.fit(X_new1, y_train)
 print("卡方分配法找出的五個變數的模型正確率＝",
-      format(clf.score(X_new1, y)*100,".2f"),"%","樹深度為",clf.get_depth())
-clf.fit(X_top4, y)
+      format(clf.score(X_new1, y_train)*100,".2f"),"%","樹深度為",clf.get_depth())
+clf.fit(X_top4, y_train)
 print("卡方分配法找出的前四變數的模型正確率＝",
-      format(clf.score(X_top4, y)*100,".2f"),"%","樹深度為",clf.get_depth())
-clf.fit(X_new2, y)
+      format(clf.score(X_top4, y_train)*100,".2f"),"%","樹深度為",clf.get_depth())
+clf.fit(X_new2, y_train)
 print("建模方法找出的三個變數的模型正確率=",
-      format(clf.score(X_new2, y)*100,".2f"),"%","樹深度為",clf.get_depth())
+      format(clf.score(X_new2, y_train)*100,".2f"),"%","樹深度為",clf.get_depth())
 
 #%%1 決策樹(全變數X編碼與分割)
 from sklearn.preprocessing import LabelEncoder
@@ -398,44 +403,12 @@ import graphviz
 graph=graphviz.Source(dot_data)
 graph.format="png"
 graph.render("tree_全變數",view=False)
-#%%1 決策樹:全變數X建模(entropy)：clf3,4
-#3
-clf3=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
-                            min_samples_leaf=80, min_samples_split=0.3)
-clf3.fit(X_train,y_train)
-print("建模正確率=",format(clf3.score(X_train,y_train)*100,".2f"),"%")
-print("測試正確率=",format(clf3.score(X_test,y_test)*100,".2f"),"%")
-print("樹的葉子有多少個=",clf3.get_n_leaves())
-print("樹的深度有多少層=",clf3.get_depth())
 
-#4
-clf4=DecisionTreeClassifier(random_state=20240104,criterion="entropy",
-                            min_samples_leaf=80, min_samples_split=0.3)
-clf4.fit(X_train,y_train)
-print("建模正確率=",format(clf4.score(X_train,y_train)*100,".2f"),"%")
-print("測試正確率=",format(clf4.score(X_test,y_test)*100,".2f"),"%")
-print("樹的葉子有多少個=",clf4.get_n_leaves())
-print("樹的深度有多少層=",clf4.get_depth())
-#繪圖(選3)
-from sklearn import tree
-dot_data=tree.export_graphviz(clf3,out_file=None,
-                              feature_names=X.columns,
-                              leaves_parallel=False,
-                              impurity=True,
-                              proportion=True,
-                              rounded=True,
-                              class_names=["死亡","獲救"],
-                              filled=True
-                              )
-import os
-os.environ["PATH"] = "/opt/local/bin/"
-import graphviz
-graph=graphviz.Source(dot_data)
-graph.format="png"
-graph.render("tree_entropy",view=False)
 #%%1 決策樹:部分變數X_new2(分割)
-from sklearn.model_selection import train_test_split
-X2_train, X2_test, y2_train, y2_test=train_test_split(
+X2_train=X_new2
+y2_train=y_train
+X2_test=X_test[['Types_of_waters','Drowning_reasons','Age']]
+y2_test=y_test
     X_new2,y,test_size=0.2, random_state=20240104)
 #%%1 決策樹:部分變數X_new2建模
 
@@ -610,14 +583,14 @@ print("Linear4測試正確率＝", m4.score(X_test_std, y_test))
 ##SVC
 from sklearn.svm import SVC
 #5
-m5=SVC(gamma=0.8, kernel="rbf",probability=True)
+m5=SVC(gamma=0.1, kernel="rbf",probability=True)
 m5.fit(X_train_std, y_train)
 y_pred=m5.predict(X_train_std)
 print("SVC1訓練正確率＝", m5.score(X_train_std, y_train))
 print("SVC1測試正確率＝", m5.score(X_test_std, y_test))
 
 #6
-m6=SVC(gamma=0.5, kernel="rbf",probability=True)
+m6=SVC(gamma=0.3, kernel="rbf",probability=True)
 m6.fit(X_train_std, y_train)
 y_pred=m6.predict(X_train_std)
 print("SVC2訓練正確率＝", m6.score(X_train_std, y_train))
@@ -831,12 +804,17 @@ print("集成分析法hard訓練資料集正確率=",clf41.score(X_train_std, y_
 print("集成分析法hard測試資料集正確率=",clf41.score(X_test_std, y_test))
 clf42.fit(X_train_std, y_train)
 print("集成分析法soft訓練資料集正確率=",clf42.score(X_train_std, y_train))
-print("集成分析法soft測試資料集正確率=",clf42.score(X_test_std, y_test))
+print("集成分析法soft測試資料集正確率=",clf42.score(X_test_std, y_test)) 
+
+
+
+
+
 #%%7 k-means前處理
 import pandas as pd
 import numpy as np
 import statistics
-
+data1.info()
 #編碼
 #(Label Encoder) #Is_Holiday為布林值，OneHot會出問題
 from sklearn.preprocessing import LabelEncoder
@@ -851,22 +829,6 @@ Types_of_waters=ohe.fit_transform(data1[["Types_of_waters"]])
 Types_of_waters=pd.DataFrame(Types_of_waters)
 Types_of_waters.columns=ohe.categories_[0]
 
-Season=ohe.fit_transform(data1[["Season"]])
-Season=pd.DataFrame(Season)
-Season.columns=ohe.categories_[0]
-
-Drowning_reasons=ohe.fit_transform(data1[["Drowning_reasons"]])
-Drowning_reasons=pd.DataFrame(Drowning_reasons)
-Drowning_reasons.columns=ohe.categories_[0]
-
-time_period=ohe.fit_transform(data1[["time_period"]])
-time_period=pd.DataFrame(time_period)
-time_period.columns=ohe.categories_[0]
-
-Swimming_skills=ohe.fit_transform(data1[["Swimming_skills"]])
-Swimming_skills=pd.DataFrame(Swimming_skills)
-Swimming_skills.columns=ohe.categories_[0]
-
 Gender=ohe.fit_transform(data1[["Gender"]])
 Gender=pd.DataFrame(Gender)
 Gender.columns=ohe.categories_[0]
@@ -875,7 +837,17 @@ Region=ohe.fit_transform(data1[["Region"]])
 Region=pd.DataFrame(Region)
 Region.columns=ohe.categories_[0]
 
+Season=ohe.fit_transform(data1[["Season"]])
+Season=pd.DataFrame(Season)
+Season.columns=ohe.categories_[0]
 
+time_period=ohe.fit_transform(data1[["time_period"]])
+time_period=pd.DataFrame(time_period)
+time_period.columns=ohe.categories_[0]
+
+Drowning_reasons=ohe.fit_transform(data1[["Drowning_reasons"]])
+Drowning_reasons=pd.DataFrame(Drowning_reasons)
+Drowning_reasons.columns=ohe.categories_[0]
 
 #標準化
 X1=data1["Age"]
@@ -888,8 +860,14 @@ X1=pd.DataFrame(X1)
 X1.columns=["Age"]
 Age=X1      
 
-X=pd.concat([Age,Types_of_waters,Season,Is_Holiday,Drowning_reasons,
-             time_period,Swimming_skills,Gender,Region], axis=1)
+X=pd.concat([Types_of_waters,Drowning_reasons,Gender,Age,Region,
+             Is_Holiday,Season,time_period], axis=1)
+y=pd.Series(data1["Drowning_results"],name="Drowning_results")
+
+#分割
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test=train_test_split(
+    X,y,test_size=0.2, random_state=20240104)
 #%%7 k-means(未加入目標變數)
 
 #Kmeans 陡坡圖
@@ -919,14 +897,14 @@ centroid=pd.DataFrame(kmeans.cluster_centers_,columns=X.columns)
 
 X_pred=kmeans.predict(X)
 print(pd.crosstab(data1["Drowning_results"], X_pred))
-print("用分群來預測分類的正確率＝",(313+177+119+180)/1242) #0.6353
+print("用分群來預測分類的正確率＝",(314+124+164+178)/1242) #0.6280
 #%%7 k-means(加入目標變數)
 
 Drowning_results=pd.Series(
     le.fit_transform(data1["Drowning_results"]),name="Drowning_results")
 
-Xy=pd.concat([Age,Types_of_waters,Season,Is_Holiday,Drowning_reasons,
-             time_period,Swimming_skills,Gender,Region,Drowning_results], axis=1)
+Xy=pd.concat([Types_of_waters,Drowning_reasons,Gender,Age,Region,
+             Is_Holiday,Season,time_period,Drowning_results], axis=1)
 
 
 
@@ -957,17 +935,17 @@ centroid2=pd.DataFrame(kmeans2.cluster_centers_,columns=Xy.columns)
 
 X_pred2=kmeans2.predict(Xy)
 print(pd.crosstab(data1["Drowning_results"], X_pred2))
-print("加目標變數後用分群來預測分類的正確率＝",(335+175+140+182)/1242) #0.6699
+print("加目標變數後用分群來預測分類的正確率＝",(181+147+169+327)/1242) #0.6634
 
 #%%7 k-means 比較
 
 #比較加入目標變數分群的正確率變化(分4群)：
-print("用分群來預測分類的SSE＝",distortion[3]) #5567.44
-print("加目標變數後用分群來預測分類的SSE＝",distortion2[3]) #5832.52
+print("用分群來預測分類的SSE＝",distortion[3]) #5167.24
+print("加目標變數後用分群來預測分類的SSE＝",distortion2[3]) #5434.05
 
 #比較加入目標變數分群SSE變化(分4群)：
-print("用分群來預測分類的＝",(313+177+119+180)/1242) #0.6353
-print("加目標變數後用分群來預測分類的正確率＝",(335+175+140+182)/1242) #0.6699
+print("用分群來預測分類的＝",(314+124+164+178)/1242) #0.6280
+print("加目標變數後用分群來預測分類的正確率＝",(181+147+169+327)/1242) #0.6634
 #%%
 
 

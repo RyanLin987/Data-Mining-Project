@@ -17,14 +17,14 @@ str(dat)
 
 set.seed(20240104)
 n<-nrow(dat)
-sindex<-sample(n,round(n*0.7))
+sindex<-sample(n,round(n*0.8))
 TrainD<-dat[sindex,]
 TestD<-dat[-sindex,]
 
 
 #全變數：
 library(RWeka)
-ctree<-J48(Drowning_results~.,data=TrainD,control=Weka_control(M=3,C=0.3))
+ctree<-J48(Drowning_results~.,data=TrainD,control=Weka_control(M=2,C=0.1))
 print(ctree)
 #library(partykit)
 #rparty.tree<-as.party(ctree)
