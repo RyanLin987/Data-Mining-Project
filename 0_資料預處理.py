@@ -6,11 +6,6 @@ data = pd.read_csv("2014-2021消防機關水域救援統計.csv", encoding="cp95
 # data.info()
 
 data.drop(0,axis=0,inplace=True) #刪除中文欄位名
-data.drop(["Number","Location_of_drowning","Swimming_skills"],axis=1,inplace=True) #刪除欄位
-## 刪除理由：
-# Number
-# Location_of_drowning
-# Swimming_skills
 
 #調整年齡欄位
 data["Age"]=np.where(data["Age"].isnull(), data["Unnamed: 13"], data["Age"])
@@ -21,6 +16,7 @@ data.rename(columns={'Types_of _waters': 'Types_of_waters'}, inplace=True)
 # data.info()
 
 #值的轉換（數值型）
+data['Number'] = pd.to_numeric(data['Number'], errors='coerce')
 data['Year'] = pd.to_numeric(data['Year'], errors='coerce')
 data['Month'] = pd.to_numeric(data['Month'], errors='coerce')
 data['Day'] = pd.to_numeric(data['Day'], errors='coerce')
@@ -34,11 +30,18 @@ data['Drowning_reasons'] = data['Drowning_reasons'].str.strip()
 data['Drowning_results'] = data['Drowning_results'].str.strip()
 data['Patient_ID'] = data['Patient_ID'].str.strip()
 data['Gender'] = data['Gender'].str.strip()
+data['Location_of_drowning'] = data['Location_of_drowning'].str.strip()
+data['Swimming_skills'] = data['Swimming_skills'].str.strip()
 # data.info()
 
 #擷取需要的年份資料
 data = data[(data["Year"]==2020)| (data["Year"]==2021)]
 data["Age"]=np.where(data["Age"].isnull(), np.nanmedian(data["Age"]), data["Age"])
+
+data.drop(["Number","Location_of_drowning","Swimming_skills"],axis=1,inplace=True) #刪除欄位
+## 刪除理由：
+# Location_of_drowning
+# Swimming_skills
 #%%P 資料前處理2
 data['City_or_County'].value_counts() #衍生出區域
 data['Year'].value_counts()  
@@ -52,8 +55,7 @@ data['Drowning_results'].value_counts() #目標變數，將失蹤歸類進死亡
 data['Gender'].value_counts() #不祥則填入眾數
 data['Age'].value_counts() 
 data['Patient_ID'].value_counts()
-
-
+# selected_X.info()
 
 data['City_or_County'].value_counts() #衍生出區域
 county_to_region = {
@@ -97,7 +99,7 @@ data['Is_Holiday'] = data['Date'].apply(lambda x: x in tw_holidays)
 data["Is_Holiday"]=np.where(
     (data["Day_of_Week"]=="Saturday") | (data["Day_of_Week"]=="Sunday"), 
     True, data["Is_Holiday"])
-
+data['Is_Holiday'].value_counts()
 
 
 data['Month'].value_counts() #月衍生出季節
@@ -175,6 +177,11 @@ X=pd.DataFrame([Types_of_waters,Drowning_reasons,Gender,data["Age"],Region,
 X.columns=["Types_of_waters","Drowning_reasons","Gender","Age","Region",
            "Is_Holiday","Season","time_period"]
 y=data["Drowning_results"].reset_index(drop=True)
+
+#分割訓練測試
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test=train_test_split(
+    X,y,test_size=0.2, random_state=20240104)
 
 
 
